@@ -13,19 +13,19 @@
       document.head.appendChild(s);
     });
   }
-  async function gfetch(url, opt) {
+  async function gfetch(url, opt, what) {
     opt = opt || {}; opt.headers = Object.assign({ Authorization: 'Bearer ' + token }, opt.headers || {});
     const r = await fetch(url, opt);
     if (r.status === 401) { token = null; $('gUp').disabled = $('gDown').disabled = true; throw new Error('Phiên đăng nhập hết hạn, hãy kết nối lại.'); }
     if (!r.ok) {
       let why = '';
       try { const j = await r.clone().json(); why = (j.error && (j.error.message || j.error.status)) || ''; } catch (e) { /* không có nội dung */ }
-      throw new Error('Google Drive báo lỗi ' + r.status + (why ? ': ' + why : ''));
+      throw new Error('Google Drive báo lỗi ' + r.status + (what ? ' (' + what + ')' : '') + (why ? ': ' + why : ''));
     }
     return r;
   }
   async function findFile() {
-    const r = await gfetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=' + encodeURIComponent("name='so-xe.json'") + '&fields=files(id)');
+    const r = await gfetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=' + encodeURIComponent("name='so-xe.json'") + '&fields=files(id)', null, 'tìm file');
     const j = await r.json(); return j.files && j.files[0] ? j.files[0].id : null;
   }
 
@@ -59,12 +59,12 @@
         try {
           gs('Đang lưu lên Drive…');
           const id = await findFile(), body = SX.backup();
-          if (id) await gfetch('https://www.googleapis.com/upload/drive/v3/files/' + id + '?uploadType=media', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body });
+          if (id) await gfetch('https://www.googleapis.com/upload/drive/v3/files/' + id + '?uploadType=media', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body }, 'ghi file');
           else {
             const b = 'soxe' + uid();
             const meta = JSON.stringify({ name: 'so-xe.json', parents: ['appDataFolder'] });
             const mp = '--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n--' + b + '\r\nContent-Type: application/json\r\n\r\n' + body + '\r\n--' + b + '--';
-            await gfetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + b }, body: mp });
+            await gfetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + b }, body: mp }, 'tạo file');
           }
           gs('Đã lưu lên Drive lúc ' + new Date().toLocaleTimeString('vi-VN') + '.', 'ok');
         } catch (e) { gs(e.message, 'err'); }
@@ -74,7 +74,7 @@
           gs('Đang tải từ Drive…');
           const id = await findFile();
           if (!id) { gs('Chưa có bản sao lưu nào trên Drive. Hãy bấm "Lưu lên Drive" trước.', 'err'); return; }
-          const r = await gfetch('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media');
+          const r = await gfetch('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media', null, 'đọc file');
           const ok = SX.restore(await r.text());
           gs(ok ? 'Đã tải và khôi phục từ Drive.' : 'Đã hủy khôi phục.', ok ? 'ok' : '');
         } catch (e) { gs(e.message, 'err'); }
