@@ -25,7 +25,7 @@
     return r;
   }
   async function findFile() {
-    const r = await gfetch('https://www.googleapis.com/drive/v3/files?spaces=appdata&q=' + encodeURIComponent("name='so-xe.json'") + '&fields=files(id)');
+    const r = await gfetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=' + encodeURIComponent("name='so-xe.json'") + '&fields=files(id)');
     const j = await r.json(); return j.files && j.files[0] ? j.files[0].id : null;
   }
 
