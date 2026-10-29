@@ -151,3 +151,9 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
   .view:not(#v-report){display:none!important}
   .card{border:1px solid #999;break-inside:avoid}
 }
+
+.scanbox{border:1px dashed var(--line,#cbd5e1);border-radius:12px;padding:10px;margin:8px 0 12px}
+.scanbox .btns{margin-top:8px}
+#vMore summary{cursor:pointer;font-weight:600;margin:6px 0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}
+.kv span{color:var(--mut)}.kv b{word-break:break-all;font-weight:600}

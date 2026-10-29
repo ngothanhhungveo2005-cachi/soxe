@@ -6,14 +6,14 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="theme-color" content="#0f6a5a">
 <title>Sổ Xe</title>
-<link rel="stylesheet" href="css/style.css?v=3.0.3">
+<link rel="stylesheet" href="css/style.css?v=3.1.0">
 </head>
 <body>
 <div class="wrap">
   <header>
     <div>
       <h1>🚗 Sổ Xe</h1>
-      <div class="sub">Chi phí · Bảo dưỡng · Đăng kiểm · Dẫn đường · v3.0.3</div>
+      <div class="sub">Chi phí · Bảo dưỡng · Đăng kiểm · Dẫn đường · v3.1.0</div>
     </div>
   </header>
 
@@ -231,6 +231,15 @@
   <section id="v-data" class="view hidden">
     <div class="card hidden" id="vehCard">
       <h2 id="vehTitle">🚗 Thêm xe</h2>
+      <div class="scanbox">
+        <b>📷 Thêm nhanh bằng giấy đăng ký xe (cà vẹt)</b>
+        <div class="btns">
+          <button class="pri" id="regCam" type="button">📸 Chụp giấy đăng ký</button>
+          <button id="regFile" type="button">🖼️ Chọn ảnh</button>
+        </div>
+        <input type="file" id="regInput" accept="image/*" class="hidden">
+        <div class="status" id="regStatus">Chụp hoặc chọn ảnh giấy đăng ký xe, app tự điền biển số, số khung, số máy, nhãn hiệu, màu sơn, năm sản xuất, chủ xe… Bạn kiểm tra lại rồi bấm Lưu.</div>
+      </div>
       <div class="row">
         <div><label>Tên xe</label><input id="vName" placeholder="Ví dụ: Honda Vision, Vios 2020"></div>
         <div><label>Loại xe</label><select id="vKind"><option value="bike">🛵 Xe máy</option><option value="car">🚗 Ô tô</option></select></div>
@@ -239,6 +248,30 @@
         <div><label>Biển số</label><input id="vPlate" placeholder="51F-123.45"></div>
         <div><label>Số km hiện tại</label><input id="vOdo" type="number" inputmode="numeric" min="0" placeholder="0"></div>
       </div>
+      <details id="vMore" open>
+        <summary>Thông tin giấy đăng ký</summary>
+        <div class="row">
+          <div><label>Chủ xe</label><input id="vOwner"></div>
+          <div><label>Nhãn hiệu</label><input id="vBrand" placeholder="Honda, Toyota…"></div>
+        </div>
+        <div class="row">
+          <div><label>Số loại (dòng xe)</label><input id="vModel" placeholder="Vision, Vios…"></div>
+          <div><label>Màu sơn</label><input id="vColor"></div>
+        </div>
+        <div class="row">
+          <div><label>Số khung</label><input id="vChassis" autocapitalize="characters" placeholder="RLH…"></div>
+          <div><label>Số máy</label><input id="vEngine" autocapitalize="characters" placeholder="JF58E…"></div>
+        </div>
+        <div class="row">
+          <div><label>Năm sản xuất</label><input id="vYear" type="number" inputmode="numeric" placeholder="2020"></div>
+          <div><label>Dung tích (cm³)</label><input id="vCap" type="number" inputmode="numeric" placeholder="109"></div>
+        </div>
+        <div class="row">
+          <div><label>Số chỗ ngồi</label><input id="vSeats" type="number" inputmode="numeric" placeholder="2"></div>
+          <div><label>Đăng ký lần đầu</label><input id="vRegDate" type="date"></div>
+        </div>
+        <label class="chk"><input type="checkbox" id="vKeep"> Lưu kèm ảnh giấy đăng ký (ảnh nhỏ, chiếm ít bộ nhớ)</label>
+      </details>
       <div class="row">
         <div><label>⛽ Dung tích bình xăng (lít)</label><input id="vTank" type="number" inputmode="decimal" step="0.1" placeholder="Ví dụ 5.5"></div>
         <div><label>Tiêu hao công bố (L/100km)</label><input id="vCons" type="number" inputmode="decimal" step="0.1" placeholder="Ví dụ 1.9"></div>
@@ -251,6 +284,43 @@
         <button class="pri" id="vSave">Lưu xe</button>
         <button id="vCancel" class="hidden">Hủy</button>
       </div>
+    </div>
+
+    <div class="card" id="vinfoCard">
+      <h2>🪪 Thông tin xe</h2>
+      <div id="vinfo"></div>
+    </div>
+
+    <div class="card" id="inspCard">
+      <h2 id="inspTitle">📋 Đăng kiểm</h2>
+      <div id="inspNow" class="note"></div>
+      <div class="scanbox">
+        <b>📷 Nhập bằng giấy chứng nhận / tem kiểm định</b>
+        <div class="btns">
+          <button class="pri" id="inspCam" type="button">📸 Chụp giấy đăng kiểm</button>
+          <button id="inspFile" type="button">🖼️ Chọn ảnh</button>
+        </div>
+        <input type="file" id="inspInput" accept="image/*" class="hidden">
+        <div class="status" id="inspStatus">Chụp hoặc chọn ảnh giấy kiểm định, app tự đọc ngày kiểm định, ngày hết hạn, số seri, trung tâm, phí. Bạn kiểm tra lại rồi lưu.</div>
+      </div>
+      <div class="row">
+        <div><label>Ngày kiểm định</label><input id="iDate" type="date"></div>
+        <div><label>Hết hạn</label><input id="iExp" type="date"></div>
+      </div>
+      <div class="row">
+        <div><label>Số seri / số giấy</label><input id="iCert"></div>
+        <div><label>Số km</label><input id="iOdo" type="number" inputmode="numeric" min="0"></div>
+      </div>
+      <div class="row">
+        <div><label>Trung tâm đăng kiểm</label><input id="iCenter" placeholder="Ví dụ: 6102S"></div>
+        <div><label>Phí (đ)</label><input id="iCost" type="number" inputmode="numeric" min="0"></div>
+      </div>
+      <div class="row1"><label>Ghi chú</label><input id="iNote"></div>
+      <label class="chk"><input type="checkbox" id="iExpense" checked> Ghi phí vào chi phí xe (loại "Gửi xe / phí")</label>
+      <label class="chk"><input type="checkbox" id="iKeep"> Lưu kèm ảnh giấy (ảnh nhỏ)</label>
+      <div class="btns"><button class="pri" id="iSave">Lưu đăng kiểm</button><button id="iCancel" class="hidden">Hủy sửa</button></div>
+      <h3 style="margin:14px 0 6px">Lịch sử đăng kiểm</h3>
+      <div id="ihist" class="hist"></div>
     </div>
 
     <div class="card">
@@ -303,9 +373,9 @@
 <div id="scanModal" class="modal hidden">
   <div class="modalbox">
     <video id="camVideo" playsinline muted></video>
-    <div class="status" id="camMsg">Đưa phiếu vào khung hình, giữ chắc tay rồi bấm Chụp.</div>
+    <div class="status" id="camMsg">Đưa giấy vào khung hình, giữ chắc tay rồi bấm Chụp.</div>
     <div class="btns" style="margin-top:10px;justify-content:center">
-      <button class="pri" id="camShot">📸 Chụp &amp; đọc phiếu</button>
+      <button class="pri" id="camShot">📸 Chụp &amp; đọc</button>
       <button id="camClose">Đóng</button>
     </div>
   </div>
@@ -325,13 +395,13 @@
 
 <div id="toast"></div>
 
-<script src="js/logic.js?v=3.0.3"></script>
-<script src="js/app.js?v=3.0.3"></script>
-<script src="js/geo.js?v=3.0.3"></script>
-<script src="js/scan.js?v=3.0.3"></script>
-<script src="js/map.js?v=3.0.3"></script>
-<script src="js/drive.js?v=3.0.3"></script>
-<script src="js/gdrive.js?v=3.0.3"></script>
+<script src="js/logic.js?v=3.1.0"></script>
+<script src="js/app.js?v=3.1.0"></script>
+<script src="js/geo.js?v=3.1.0"></script>
+<script src="js/scan.js?v=3.1.0"></script>
+<script src="js/map.js?v=3.1.0"></script>
+<script src="js/drive.js?v=3.1.0"></script>
+<script src="js/gdrive.js?v=3.1.0"></script>
 <script>SX.init();</script>
 </body>
 </html>

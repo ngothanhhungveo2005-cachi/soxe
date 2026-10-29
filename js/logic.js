@@ -201,6 +201,107 @@
     return res;
   };
 
+  /* ---------- đọc giấy đăng ký xe / giấy chứng nhận kiểm định ---------- */
+  const toISO = (d, m, y) => {
+    d = +d; m = +m; y = +y; if (y < 100) y += 2000;
+    return d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1980 && y <= 2100 ? y + '-' + p2(m) + '-' + p2(d) : null;
+  };
+  const allDates = str => {
+    const out = [], re = /(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{4}|\d{2})\b/g; let m;
+    while ((m = re.exec(str))) { const iso = toISO(m[1], m[2], m[3]); if (iso) out.push(iso); }
+    return out;
+  };
+  const monthYearEnd = str => { // "11/2027" → ngày cuối tháng
+    const m = String(str).match(/(?:^|\D)(\d{1,2})\s*[\/\-.]\s*(20\d{2})(?!\d)/);
+    if (!m || +m[1] < 1 || +m[1] > 12) return null;
+    return m[2] + '-' + p2(+m[1]) + '-' + p2(new Date(+m[2], +m[1], 0).getDate());
+  };
+  const titleCase = v => v !== v.toUpperCase() ? v : v.toLowerCase().replace(/(^|[\s\-])(\S)/g, (m, a, b) => a + b.toUpperCase());
+  const cleanText = v => String(v || '').replace(/[|_=~\[\]{}<>]/g, ' ').replace(/\s+/g, ' ').trim();
+  const KNOWN_LABEL = /(so may|so khung|nhan hieu|mau son|chu xe|loai xe|dung tich|nam san xuat|bien so|so loai|dang ky lan dau|so cho|seri|hieu luc|ngay kiem dinh|trung tam|don vi)/;
+
+  // giá trị của một nhãn: ưu tiên phần sau dấu ":" cuối cùng; nếu trống thì lấy dòng kế tiếp
+  function valueAfter(lines, i, re) {
+    const raw = lines[i], f = fold(raw), m = re.exec(f);
+    if (!m) return null;
+    const after = raw.slice(m.index + m[0].length);
+    const ci = after.lastIndexOf(':');
+    let v = ci >= 0 ? after.slice(ci + 1) : after.replace(/^[\s\/\-|.()]*(?:[A-Za-z .°'N]{0,28}[\/|)]\s*)?/, '');
+    v = v.replace(/^[\s:|\-_]+/, '').trim();
+    if (v.length < 2 && lines[i + 1] && !KNOWN_LABEL.test(fold(lines[i + 1]))) v = lines[i + 1].trim();
+    return v;
+  }
+  function firstField(lines, re) {
+    for (let i = 0; i < lines.length; i++) if (re.test(fold(lines[i]))) { const v = valueAfter(lines, i, re); if (v) return v; }
+    return '';
+  }
+  const PLATE_RE = /\b(\d{2}[A-Z]{1,2}\d?)[\s\-.]{0,2}(\d{3}[\s.]?\d{2}|\d{4,5})\b/;
+  const findPlate = text => { const m = fold(text).toUpperCase().match(PLATE_RE); return m ? L.normPlate(m[1] + m[2]) : ''; };
+  const cleanChassis = v => { let c = String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c.length === 17) c = c.replace(/[OQ]/g, '0').replace(/I/g, '1'); return c.length >= 8 && c.length <= 20 && /\d/.test(c) ? c : ''; };
+  const cleanEngine = v => { const c = String(v || '').toUpperCase().replace(/[^A-Z0-9\-]/g, ''); return c.length >= 6 && c.length <= 24 && /\d/.test(c) ? c : ''; };
+  const odoFrom = lines => {
+    for (const ln of lines) {
+      const f = fold(ln);
+      const m = f.match(/(?:so km|odo|km hien tai|cong to met|ctm|km di duoc|km da di)\D{0,14}(\d{1,3}(?:[.,]\d{3})+|\d{3,7})/) || f.match(/(\d{1,3}(?:[.,]\d{3})+|\d{3,7})\s*km\b/);
+      if (m) { const v = parseInt(m[1].replace(/\D/g, ''), 10); if (v >= 100 && v <= 999999) return v; }
+    }
+    return 0;
+  };
+  const splitLines = text => String(text || '').split(/\r?\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
+
+  L.parseRegistration = function (text) {
+    const lines = splitLines(text);
+    const res = { plate: '', brand: '', model: '', type: '', color: '', engine: '', chassis: '', capacity: 0, year: 0, seats: 0, owner: '', regDate: '', kind: '' };
+    res.plate = findPlate(text);
+    res.brand = titleCase(cleanText(firstField(lines, /nhan hieu|\bbrand\b|hieu xe/)).slice(0, 30));
+    const model = cleanText(firstField(lines, /so loai|model code|\bmodel\b/)).slice(0, 30);
+    res.model = /[\d\-]/.test(model) ? model : titleCase(model);
+    res.type = cleanText(firstField(lines, /loai xe|\btype\b/)).slice(0, 40);
+    res.color = titleCase(cleanText(firstField(lines, /mau son|\bcolou?r\b/)).slice(0, 24));
+    res.engine = cleanEngine(firstField(lines, /so may|engine/));
+    res.chassis = cleanChassis(firstField(lines, /so khung|chassis|\bvin\b/));
+    const cap = firstField(lines, /dung tich|cylinder/).match(/(\d{2,4})(?:[.,]\d+)?/); res.capacity = cap ? +cap[1] : 0;
+    const yr = firstField(lines, /nam san xuat|year of manufacture|nam sx/).match(/(19|20)\d{2}/); res.year = yr ? +yr[0] : 0;
+    const st = firstField(lines, /so cho|seat|cho ngoi/).match(/\d{1,2}/); res.seats = st ? +st[0] : 0;
+    res.owner = titleCase(cleanText(firstField(lines, /chu xe|\bowner\b|ten chu/)).replace(/\(.*?\)/g, '').slice(0, 60));
+    const rd = firstField(lines, /dang ky lan dau|first registered|ngay dang ky|date of first/); res.regDate = (allDates(rd)[0]) || '';
+    const t = fold(res.type);
+    if (/mo to|xe may|2 banh|hai banh/.test(t)) res.kind = 'bike';
+    else if (/o to|oto|con\b|tai\b|khach|ban tai|\bpick/.test(t) || res.seats >= 4) res.kind = 'car';
+    else if (res.capacity > 0 && res.capacity <= 175 && res.seats <= 2) res.kind = 'bike';
+    return res;
+  };
+
+  L.parseInspection = function (text) {
+    const lines = splitLines(text);
+    const res = { plate: findPlate(text), date: '', expiry: '', certNo: '', center: '', cost: 0, odo: odoFrom(lines), chassis: '', engine: '' };
+    res.chassis = cleanChassis(firstField(lines, /so khung|chassis|\bvin\b/));
+    res.engine = cleanEngine(firstField(lines, /so may|engine/));
+    const DATE_L = /ngay kiem dinh|date of inspection|inspection date|kiem dinh ngay|ngay kd/;
+    const EXP_L = /hieu luc|valid until|het han|han den|expir|co gia tri den/;
+    lines.forEach((ln, i) => {
+      const f = fold(ln), isD = DATE_L.test(f), isE = EXP_L.test(f);
+      if (!isD && !isE) return;
+      let ds = allDates(ln); if (!ds.length && !monthYearEnd(ln) && lines[i + 1]) ds = allDates(lines[i + 1]);
+      ds = ds.slice().sort();
+      if (isE) {
+        const exp = ds.length ? ds[ds.length - 1] : (monthYearEnd(ln) || (lines[i + 1] ? monthYearEnd(lines[i + 1]) : null));
+        if (exp && !res.expiry) res.expiry = exp;
+        if (ds.length > 1 && !res.date) res.date = ds[0];
+      }
+      if (isD && ds.length && !res.date) res.date = ds[0];
+    });
+    if ((!res.date || !res.expiry)) { // không có nhãn rõ ràng: sớm nhất = ngày kiểm định, muộn nhất = hết hạn
+      const all = allDates(text).sort();
+      if (all.length >= 2) { if (!res.date) res.date = all[0]; if (!res.expiry) res.expiry = all[all.length - 1]; }
+    }
+    const seri = firstField(lines, /so seri|serial|so giay chung nhan|\bseri\b/);
+    const cn = String(seri).toUpperCase().replace(/[^A-Z0-9\-\/]/g, ''); res.certNo = cn.length >= 5 && cn.length <= 24 ? cn : '';
+    res.center = cleanText(firstField(lines, /trung tam|don vi kiem dinh|co so dang kiem|inspection (center|station)|tram dang kiem/)).slice(0, 80);
+    lines.forEach(ln => { if (/\bphi\b|le phi|\bfee\b|tong tien|thanh tien/.test(fold(ln))) res.cost = Math.max(res.cost, ...moneyVals(ln), 0); });
+    return res;
+  };
+
   /* ---------- tổng hợp báo cáo ---------- */
   L.kmSpan = list => {
     const by = {};

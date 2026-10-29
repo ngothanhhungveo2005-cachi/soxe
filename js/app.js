@@ -52,6 +52,7 @@
       if (!v.kind) v.kind = v.tank > 15 ? 'car' : 'bike';
       if (!Array.isArray(v.sched)) v.sched = LX.makeSched(v.kind);
       v.inspectExp = v.inspectExp || ''; v.insExp = v.insExp || '';
+      if (!Array.isArray(v.inspections)) v.inspections = [];
     });
     S.entries.forEach(e => { e.amount = +e.amount || 0; if (!Array.isArray(e.items)) e.items = []; });
     if (!S.cur && S.vehicles[0]) S.cur = S.vehicles[0].id;
@@ -468,32 +469,156 @@
   }
 
   /* ================= XE ================= */
-  let editVid = null, addingVeh = false;
+  let editVid = null, addingVeh = false, vImg = null;
+  const VF = { vOwner: 'owner', vBrand: 'brand', vModel: 'model', vColor: 'color', vChassis: 'chassis', vEngine: 'engine', vRegDate: 'regDate' };
+  const VN = { vYear: 'year', vCap: 'capacity', vSeats: 'seats' };
   function showVehForm(v) {
-    show('data'); addingVeh = true; editVid = v ? v.id : null;
+    show('data'); addingVeh = true; editVid = v ? v.id : null; vImg = v && v.regImg ? v.regImg : null;
     $('vehCard').classList.remove('hidden');
     $('vehTitle').textContent = v ? '✏️ Sửa xe' : '🚗 Thêm xe';
     $('vName').value = v ? v.name : ''; $('vPlate').value = v ? v.plate : ''; $('vKind').value = v ? v.kind : 'bike';
     $('vOdo').value = v ? v.odo : ''; $('vTank').value = v && v.tank ? v.tank : ''; $('vCons').value = v && v.cons ? v.cons : '';
     $('vInspect').value = v ? v.inspectExp : ''; $('vIns').value = v ? v.insExp : '';
+    Object.keys(VF).forEach(id => $(id).value = v && v[VF[id]] || '');
+    Object.keys(VN).forEach(id => $(id).value = v && v[VN[id]] || '');
+    $('vKeep').checked = !!vImg;
+    $('regStatus').className = 'status';
     $('vCancel').classList.toggle('hidden', S.vehicles.length === 0);
     $('vehCard').scrollIntoView({ block: 'start' });
   }
-  function hideVehForm() { addingVeh = false; editVid = null; $('vehCard').classList.add('hidden'); }
+  function hideVehForm() { addingVeh = false; editVid = null; vImg = null; $('vehCard').classList.add('hidden'); }
   function saveVeh() {
     const name = $('vName').value.trim();
     if (!name) { toast('Nhập tên xe'); $('vName').focus(); return; }
     const data = { name, plate: $('vPlate').value.trim().toUpperCase(), kind: $('vKind').value, odo: num($('vOdo').value), tank: num($('vTank').value), cons: num($('vCons').value), inspectExp: $('vInspect').value, insExp: $('vIns').value };
+    Object.keys(VF).forEach(id => data[VF[id]] = $(id).value.trim());
+    data.chassis = data.chassis.toUpperCase(); data.engine = data.engine.toUpperCase();
+    Object.keys(VN).forEach(id => data[VN[id]] = num($(id).value));
+    data.regImg = $('vKeep').checked && vImg ? vImg : null;
     if (editVid) {
       const v = S.vehicles.find(x => x.id === editVid);
       if (v.kind !== data.kind && confirm('Bạn đổi loại xe. Thay lịch bảo dưỡng bằng bộ mặc định của loại xe mới? (Mốc lần cuối hiện tại sẽ mất)')) v.sched = LX.makeSched(data.kind);
       Object.assign(v, data);
     } else {
       const id = LX.uid();
-      S.vehicles.push(Object.assign({ id, sched: LX.makeSched(data.kind) }, data)); S.cur = id;
+      S.vehicles.push(Object.assign({ id, sched: LX.makeSched(data.kind), inspections: [] }, data)); S.cur = id;
     }
     save(); hideVehForm(); cancelMaint(); renderAll(); show('home'); toast('Đã lưu xe');
   }
+
+  // kết quả quét giấy đăng ký → điền form thêm / sửa xe
+  SX.applyReg = function (p, thumb) {
+    const same = p.plate && S.vehicles.find(x => LX.normPlate(x.plate) === p.plate);
+    if (!addingVeh) showVehForm(same || null);
+    else if (same && !editVid && confirm('Xe biển số ' + same.plate + ' đã có trong app. Cập nhật thông tin cho xe "' + same.name + '"?')) showVehForm(same);
+    const set = (id, val) => { if (val) $(id).value = val; };
+    set('vPlate', p.plate ? (p.plate.replace(/^(\d{2}[A-Z]{1,2}\d?)(\d{3})(\d{2})$/, '$1-$2.$3').replace(/^(\d{2}[A-Z]{1,2}\d?)(\d{4})$/, '$1-$2')) : '');
+    Object.keys(VF).forEach(id => set(id, p[VF[id]]));
+    Object.keys(VN).forEach(id => set(id, p[VN[id]]));
+    if (p.kind) $('vKind').value = p.kind;
+    if (!$('vName').value.trim()) $('vName').value = [p.brand, p.model].filter(Boolean).join(' ') + (p.year ? ' ' + p.year : '');
+    vImg = thumb || vImg;
+    const got = [p.plate, p.brand, p.model, p.color, p.chassis, p.engine, p.year, p.owner].filter(Boolean).length;
+    const st = $('regStatus'); st.className = 'status ' + (got >= 3 ? 'ok' : 'err');
+    st.textContent = got >= 3
+      ? 'Đã đọc được ' + got + '/8 mục chính. Hãy kiểm tra kỹ nhất là số khung, số máy và biển số vì chữ trên giấy dễ bị đọc sai, rồi bấm Lưu xe.'
+      : 'Đọc được rất ít thông tin. Hãy chụp lại rõ hơn (đủ sáng, thẳng, không rung, không lóa) hoặc nhập tay bên dưới.';
+    $('vName').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  /* ================= THÔNG TIN XE + ĐĂNG KIỂM ================= */
+  function renderVInfo() {
+    const box = $('vinfo'); box.innerHTML = ''; const v = veh();
+    $('vinfoCard').classList.toggle('hidden', !v);
+    if (!v) return;
+    const rows = [['Tên xe', v.name], ['Biển số', v.plate], ['Chủ xe', v.owner], ['Nhãn hiệu', v.brand], ['Số loại', v.model], ['Màu sơn', v.color], ['Số khung', v.chassis], ['Số máy', v.engine],
+      ['Năm sản xuất', v.year || ''], ['Dung tích', v.capacity ? v.capacity + ' cm³' : ''], ['Số chỗ ngồi', v.seats || ''], ['Đăng ký lần đầu', v.regDate ? fmtDate(v.regDate) : ''],
+      ['Số km', v.odo ? fmt(v.odo) + ' km' : ''], ['Hạn đăng kiểm', v.inspectExp ? fmtDate(v.inspectExp) : ''], ['Hạn bảo hiểm TNDS', v.insExp ? fmtDate(v.insExp) : '']].filter(r => r[1]);
+    box.append(h('div', { class: 'kv' }, rows.map(r => [h('span', null, r[0]), h('b', null, String(r[1]))])));
+    if (!v.chassis && !v.engine) box.append(h('p', { class: 'note' }, 'Chưa có số khung / số máy. Bấm "Sửa xe này" rồi chụp giấy đăng ký để app tự điền.'));
+    if (v.regImg) box.append(h('img', { class: 'thumb', src: v.regImg, alt: 'Ảnh giấy đăng ký' }));
+  }
+
+  let editIid = null, iImg = null;
+  const latestExp = v => (v.inspections || []).reduce((m, i) => i.expiry && i.expiry > m ? i.expiry : m, '');
+  function resetInsp() {
+    editIid = null; iImg = null; const v = veh();
+    ['iDate', 'iExp', 'iCert', 'iCenter', 'iCost', 'iNote'].forEach(i => $(i).value = '');
+    $('iDate').value = today(); $('iOdo').value = v && v.odo ? v.odo : '';
+    $('iExpense').checked = true; $('iKeep').checked = false; $('iCancel').classList.add('hidden'); $('iSave').textContent = 'Lưu đăng kiểm';
+  }
+  function renderInsp() {
+    const v = veh(); $('inspCard').classList.toggle('hidden', !v);
+    const box = $('ihist'); box.innerHTML = ''; if (!v) return;
+    const d = v.inspectExp ? LX.daysUntil(v.inspectExp) : null;
+    $('inspNow').textContent = v.inspectExp
+      ? 'Hạn đăng kiểm hiện tại: ' + fmtDate(v.inspectExp) + (d < 0 ? ' (đã quá hạn ' + (-d) + ' ngày)' : ' (còn ' + d + ' ngày)')
+      : 'Chưa có thông tin hạn đăng kiểm. Hãy chụp giấy kiểm định hoặc nhập bên dưới.';
+    const rows = (v.inspections || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    if (!rows.length) box.append(h('div', { class: 'empty' }, 'Chưa có lần đăng kiểm nào được ghi.'));
+    rows.forEach(i => box.append(h('div', { class: 'item' },
+      h('div', { class: 'ico' }, '📋'),
+      h('div', { class: 'mid' }, h('div', { class: 't' }, 'Kiểm định ' + (i.date ? fmtDate(i.date) : '?') + ' → hết hạn ' + (i.expiry ? fmtDate(i.expiry) : '?')),
+        h('div', { class: 'd' }, [i.cert && 'Seri ' + i.cert, i.center, i.odo && fmt(i.odo) + ' km', i.note].filter(Boolean).join(' · ')),
+        i.img ? h('img', { class: 'thumb', src: i.img, alt: 'Ảnh giấy đăng kiểm' }) : null),
+      h('div', { class: 'amt' }, i.cost ? fmt(i.cost) + ' đ' : '',
+        h('div', null, h('button', { class: 'mini', onclick: () => editInsp(i.id) }, '✏️'), h('button', { class: 'mini del', onclick: () => delInsp(i.id) }, '🗑️'))))));
+  }
+  function editInsp(id) {
+    const v = veh(), i = v && v.inspections.find(x => x.id === id); if (!i) return;
+    editIid = id; iImg = i.img || null;
+    $('iDate').value = i.date || ''; $('iExp').value = i.expiry || ''; $('iCert').value = i.cert || ''; $('iCenter').value = i.center || '';
+    $('iCost').value = i.cost || ''; $('iOdo').value = i.odo || ''; $('iNote').value = i.note || ''; $('iKeep').checked = !!i.img; $('iExpense').checked = false;
+    $('iCancel').classList.remove('hidden'); $('iSave').textContent = 'Cập nhật đăng kiểm'; $('inspCard').scrollIntoView({ block: 'start' });
+  }
+  function delInsp(id) {
+    const v = veh(); if (!v || !confirm('Xóa lần đăng kiểm này?')) return;
+    const i = v.inspections.find(x => x.id === id);
+    v.inspections = v.inspections.filter(x => x.id !== id);
+    if (i && i.eid) S.entries = S.entries.filter(e => e.id !== i.eid);
+    v.inspectExp = latestExp(v); save(); renderAll(); toast('Đã xóa');
+  }
+  function saveInsp() {
+    const v = veh(); if (!v) { toast('Hãy thêm xe trước'); return; }
+    const date = $('iDate').value, expiry = $('iExp').value;
+    if (!expiry) { toast('Nhập ngày hết hạn đăng kiểm'); $('iExp').focus(); return; }
+    if (date && date > expiry) { toast('Ngày hết hạn phải sau ngày kiểm định'); return; }
+    const rec = { date, expiry, cert: $('iCert').value.trim().toUpperCase(), center: $('iCenter').value.trim(), cost: num($('iCost').value), odo: num($('iOdo').value), note: $('iNote').value.trim(), img: $('iKeep').checked && iImg ? iImg : null };
+    let cur = editIid ? v.inspections.find(x => x.id === editIid) : null;
+    if (cur) Object.assign(cur, rec); else { cur = Object.assign({ id: LX.uid(), eid: '' }, rec); v.inspections.push(cur); }
+    if ($('iExpense').checked && rec.cost > 0 && !cur.eid) {
+      const eid = LX.uid(); cur.eid = eid;
+      S.entries.push({ id: eid, vid: v.id, date: date || today(), type: 'fee', amount: rec.cost, odo: rec.odo, liters: 0, place: rec.center, note: 'Đăng kiểm' + (rec.cert ? ' · ' + rec.cert : ''), items: [], img: null });
+    } else if (cur.eid) { const e = S.entries.find(x => x.id === cur.eid); if (e) { e.amount = rec.cost; e.date = date || e.date; e.place = rec.center; } }
+    if (rec.odo > (v.odo || 0)) v.odo = rec.odo;
+    v.inspectExp = latestExp(v);
+    save(); resetInsp(); renderAll(); toast('Đã lưu đăng kiểm. Hạn mới: ' + fmtDate(v.inspectExp));
+  }
+  SX.applyInsp = function (p, thumb) {
+    if (p.plate) {
+      const m = S.vehicles.find(x => LX.normPlate(x.plate) === p.plate);
+      if (m && m.id !== S.cur) { S.cur = m.id; save(); renderAll(); toast('Đã chuyển sang xe ' + m.name + ' theo biển số trên giấy'); }
+    }
+    const v = veh(); if (!v) return;
+    show('data'); resetInsp(); iImg = thumb || null;
+    if (p.date) $('iDate').value = p.date;
+    if (p.expiry) $('iExp').value = p.expiry;
+    if (p.certNo) $('iCert').value = p.certNo;
+    if (p.center) $('iCenter').value = p.center;
+    if (p.cost) $('iCost').value = p.cost;
+    if (p.odo) $('iOdo').value = p.odo;
+    // bổ sung số khung / số máy còn thiếu cho xe
+    let filled = '';
+    if (!v.chassis && p.chassis) { v.chassis = p.chassis; filled += ' số khung'; }
+    if (!v.engine && p.engine) { v.engine = p.engine; filled += ' số máy'; }
+    if (filled) { save(); renderVInfo(); }
+    const st = $('inspStatus'), ok = !!p.expiry;
+    st.className = 'status ' + (ok ? 'ok' : 'err');
+    st.textContent = ok
+      ? 'Đã đọc hạn đăng kiểm ' + fmtDate(p.expiry) + (p.date ? ', kiểm định ' + fmtDate(p.date) : '') + (filled ? '; đã bổ sung' + filled + ' cho xe' : '') + '. Hãy kiểm tra lại các ngày rồi bấm Lưu đăng kiểm.'
+      : 'Không đọc được ngày hết hạn. Hãy chụp lại rõ hơn hoặc nhập tay bên dưới.';
+    $('iExp').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   /* ================= SAO LƯU ================= */
   const backup = SX.backup = () => JSON.stringify({ app: 'soxe', version: 3, exportedAt: new Date().toISOString(), vehicles: S.vehicles, entries: S.entries, cur: S.cur, fav: S.fav, cams: S.cams, settings: S.settings }, null, 2);
@@ -502,7 +627,7 @@
     if (!o || !Array.isArray(o.vehicles) || !Array.isArray(o.entries)) { toast('File không đúng định dạng Sổ Xe'); return false; }
     if (!confirm('Khôi phục sẽ thay toàn bộ dữ liệu hiện tại (' + S.vehicles.length + ' xe, ' + S.entries.length + ' khoản chi) bằng bản sao lưu (' + o.vehicles.length + ' xe, ' + o.entries.length + ' khoản chi). Tiếp tục?')) return false;
     const n = Object.assign(defaults(), { vehicles: o.vehicles, entries: o.entries, cur: o.cur, fav: o.fav || [], cams: o.cams || [], settings: Object.assign(defaults().settings, o.settings || {}) });
-    n.vehicles.forEach(v => { if (!v.kind) v.kind = v.tank > 15 ? 'car' : 'bike'; if (!Array.isArray(v.sched)) v.sched = LX.makeSched(v.kind); v.inspectExp = v.inspectExp || ''; v.insExp = v.insExp || ''; });
+    n.vehicles.forEach(v => { if (!v.kind) v.kind = v.tank > 15 ? 'car' : 'bike'; if (!Array.isArray(v.sched)) v.sched = LX.makeSched(v.kind); v.inspectExp = v.inspectExp || ''; v.insExp = v.insExp || ''; if (!Array.isArray(v.inspections)) v.inspections = []; });
     n.entries.forEach(e => { e.amount = +e.amount || 0; if (!Array.isArray(e.items)) e.items = []; });
     S.vehicles = n.vehicles; S.entries = n.entries; S.fav = n.fav; S.cams = n.cams; S.settings = n.settings;
     S.cur = n.vehicles.some(v => v.id === n.cur) ? n.cur : (n.vehicles[0] ? n.vehicles[0].id : null);
@@ -534,7 +659,7 @@
   }
 
   /* ================= vẽ lại & khởi động ================= */
-  const renderAll = SX.render = () => { renderTabs(); renderAlerts(); renderHome(); renderSched(); renderMHist(); if (curView === 'report') renderReport(); $('noVeh').classList.toggle('hidden', !(['home', 'maint', 'report'].includes(curView) && !veh())); ['bEdit', 'bDel', 'bCsgt'].forEach(i => $(i).disabled = !veh()); };
+  const renderAll = SX.render = () => { renderTabs(); renderAlerts(); renderHome(); renderSched(); renderMHist(); renderVInfo(); renderInsp(); if (curView === 'report') renderReport(); $('noVeh').classList.toggle('hidden', !(['home', 'maint', 'report'].includes(curView) && !veh())); ['bEdit', 'bDel', 'bCsgt'].forEach(i => $(i).disabled = !veh()); };
 
   SX.init = function () {
     document.querySelectorAll('.bottom button').forEach(b => b.onclick = () => show(b.dataset.view));
@@ -583,6 +708,7 @@
     $('fileIn').onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => SX.restore(r.result); r.readAsText(f); e.target.value = ''; };
     $('bCsv').onclick = () => csvOf(S.entries, 'so-xe-' + today() + '.csv');
 
+    $('iSave').onclick = saveInsp; $('iCancel').onclick = resetInsp; resetInsp();
     cancelEntry(); cancelMaint();
     renderAll();
     if (!S.vehicles.length) showVehForm(null); else show('home');

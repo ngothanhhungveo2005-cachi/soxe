@@ -2,20 +2,26 @@
 (function () {
   'use strict';
   const SX = window.SX, LX = SX.LX, $ = SX.$;
-  let worker = null, stream = null, busy = false;
+  let worker = null, stream = null, busy = false, camMode = 'invoice';
+  const MODES = {
+    invoice: { st: 'scanStatus', btn: ['scanCam', 'scanFile'], need: true, what: 'phiếu' },
+    reg: { st: 'regStatus', btn: ['regCam', 'regFile'], need: false, what: 'giấy đăng ký xe' },
+    insp: { st: 'inspStatus', btn: ['inspCam', 'inspFile'], need: true, what: 'giấy đăng kiểm' }
+  };
+  let curSt = 'scanStatus';
 
   const loadScript = src => new Promise((res, rej) => {
     const s = document.createElement('script'); s.src = src; s.onload = res;
     s.onerror = () => rej(new Error('Không tải được thư viện đọc chữ (kiểm tra kết nối mạng).')); document.head.appendChild(s);
   });
-  const setStatus = (m, cls) => { const s = $('scanStatus'); s.textContent = m; s.className = 'status' + (cls ? ' ' + cls : ''); };
+  const setStatus = (m, cls) => { const s = $(curSt); s.textContent = m; s.className = 'status' + (cls ? ' ' + cls : ''); };
 
   async function getWorker() {
     if (worker) return worker;
     if (!window.Tesseract) await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
     worker = await window.Tesseract.createWorker('vie', 1, {
       logger: m => {
-        if (m.status === 'recognizing text') setStatus('Đang đọc chữ trên phiếu… ' + Math.round((m.progress || 0) * 100) + '%');
+        if (m.status === 'recognizing text') setStatus('Đang đọc chữ… ' + Math.round((m.progress || 0) * 100) + '%');
         else if (/loading/.test(m.status || '')) setStatus('Đang tải dữ liệu tiếng Việt (lần đầu hơi lâu)…');
       }
     });
@@ -55,27 +61,31 @@
     return c.toDataURL('image/jpeg', 0.5);
   }
 
-  async function process(source) {
+  async function process(source, mode) {
     if (busy) return; busy = true;
-    $('scanCam').disabled = $('scanFile').disabled = true;
+    const M = MODES[mode]; curSt = M.st;
+    M.btn.forEach(b => $(b).disabled = true);
     try {
-      if (!SX.veh()) { SX.toast('Hãy thêm xe trước'); return; }
+      if (M.need && !SX.veh()) { SX.toast('Hãy thêm xe trước'); return; }
       setStatus('Đang xử lý ảnh…');
       const { canvas, original, w, h } = await toCanvas(source);
       const wk = await getWorker();
       const { data } = await wk.recognize(canvas);
-      const parsed = LX.parseInvoice(data.text || '');
-      SX.applyScan(parsed, thumbOf(original, w, h));
+      const text = data.text || '', th = thumbOf(original, w, h);
+      if (mode === 'reg') SX.applyReg(LX.parseRegistration(text), th);
+      else if (mode === 'insp') SX.applyInsp(LX.parseInspection(text), th);
+      else SX.applyScan(LX.parseInvoice(text), th);
     } catch (e) {
-      setStatus('Không đọc được phiếu: ' + (e && e.message ? e.message : e), 'err');
+      setStatus('Không đọc được ' + M.what + ': ' + (e && e.message ? e.message : e), 'err');
     } finally {
-      busy = false; $('scanCam').disabled = $('scanFile').disabled = false;
+      busy = false; M.btn.forEach(b => $(b).disabled = false);
     }
   }
 
   /* ----- camera ----- */
-  async function openCamera() {
-    if (!SX.veh()) { SX.toast('Hãy thêm xe trước'); return; }
+  async function openCamera(mode) {
+    camMode = mode;
+    if (MODES[mode].need && !SX.veh()) { SX.toast('Hãy thêm xe trước'); return; }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { SX.toast('Camera cần mở app qua https (ví dụ trang GitHub Pages)'); return; }
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
@@ -93,14 +103,16 @@
     const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
     c.getContext('2d').drawImage(v, 0, 0);
     closeCamera();
-    await process(c);
+    await process(c, camMode);
   }
 
   SX.scan = {
     init() {
-      $('scanCam').onclick = openCamera;
-      $('scanFile').onclick = () => $('scanInput').click();
-      $('scanInput').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) process(f); };
+      [['invoice', 'scanCam', 'scanFile', 'scanInput'], ['reg', 'regCam', 'regFile', 'regInput'], ['insp', 'inspCam', 'inspFile', 'inspInput']].forEach(([m, c, f, i]) => {
+        $(c).onclick = () => openCamera(m);
+        $(f).onclick = () => $(i).click();
+        $(i).onchange = e => { const x = e.target.files[0]; e.target.value = ''; if (x) process(x, m); };
+      });
       $('camShot').onclick = shot; $('camClose').onclick = closeCamera;
     }
   };
