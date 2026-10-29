@@ -17,7 +17,11 @@
     opt = opt || {}; opt.headers = Object.assign({ Authorization: 'Bearer ' + token }, opt.headers || {});
     const r = await fetch(url, opt);
     if (r.status === 401) { token = null; $('gUp').disabled = $('gDown').disabled = true; throw new Error('Phiên đăng nhập hết hạn, hãy kết nối lại.'); }
-    if (!r.ok) throw new Error('Google Drive báo lỗi ' + r.status);
+    if (!r.ok) {
+      let why = '';
+      try { const j = await r.clone().json(); why = (j.error && (j.error.message || j.error.status)) || ''; } catch (e) { /* không có nội dung */ }
+      throw new Error('Google Drive báo lỗi ' + r.status + (why ? ': ' + why : ''));
+    }
     return r;
   }
   async function findFile() {
