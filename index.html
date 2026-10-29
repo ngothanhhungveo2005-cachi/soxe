@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#0f6a5a">
+<title>Sổ Xe</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>🚗 Sổ Xe</h1>
+      <div class="sub">Chi phí · Bảo dưỡng · Đăng kiểm · Dẫn đường</div>
+    </div>
+  </header>
+
+  <div id="vtabs" class="tabs"></div>
+  <div id="alertBar"></div>
+  <div id="noVeh" class="card empty hidden">
+    Chưa có xe nào. <button class="pri" id="noVehBtn" style="margin-left:8px">Thêm xe đầu tiên</button>
+  </div>
+
+  <!-- ===== TỔNG QUAN ===== -->
+  <section id="v-home" class="view">
+    <div id="homeMain">
+      <div class="card">
+        <div class="cardhead">
+          <h2 id="statTitle">📊 Thống kê</h2>
+          <select id="period" style="width:auto">
+            <option value="month">Tháng này</option>
+            <option value="last">Tháng trước</option>
+            <option value="q">3 tháng gần đây</option>
+            <option value="year">Năm nay</option>
+            <option value="all">Tất cả</option>
+          </select>
+        </div>
+        <div class="grid" id="stats"></div>
+        <div id="chartBox" class="hidden">
+          <div class="lbl">Chi phí 6 tháng gần nhất</div>
+          <div class="bars" id="bars"></div>
+        </div>
+        <div id="splitBox" class="hidden">
+          <div class="lbl">Cơ cấu chi phí</div>
+          <div class="split" id="split"></div>
+          <div class="leg" id="leg"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 id="entTitle">➕ Ghi chi phí</h2>
+        <div class="row">
+          <div><label>Loại</label>
+            <select id="eType">
+              <option value="fuel">⛽ Đổ xăng</option>
+              <option value="maint">🛠️ Bảo dưỡng</option>
+              <option value="repair">🔧 Sửa chữa</option>
+              <option value="fee">🅿️ Gửi xe / phí đường</option>
+              <option value="other">📦 Khác</option>
+            </select></div>
+          <div><label>Ngày</label><input id="eDate" type="date"></div>
+        </div>
+        <div class="row">
+          <div><label>Số tiền (VNĐ)</label><input id="eAmt" type="number" inputmode="numeric" min="0" placeholder="Ví dụ 85000"></div>
+          <div><label>Số km trên đồng hồ (tùy chọn)</label><input id="eOdo" type="number" inputmode="numeric" min="0" placeholder="Ví dụ 12450"></div>
+        </div>
+        <div class="row" id="fuelRow">
+          <div><label>Số lít đã đổ</label><input id="eLit" type="number" inputmode="decimal" step="0.01" placeholder="Ví dụ 3.8"></div>
+          <div><label>Giá/lít (tự tính)</label><input id="ePrice" disabled placeholder="—"></div>
+        </div>
+        <div class="row1"><label>Ghi chú</label><input id="eNote" placeholder="Ví dụ: vá lốp, rửa xe…"></div>
+        <div class="btns">
+          <button class="pri" id="eSave">Lưu</button>
+          <button id="eCancel" class="hidden">Hủy sửa</button>
+        </div>
+        <p class="note">Muốn ghi phiếu bảo dưỡng chi tiết từng hạng mục (có quét ảnh/camera)? Vào tab <b>Bảo dưỡng</b>.</p>
+      </div>
+
+      <div class="card">
+        <h2>🕘 Lịch sử chi phí</h2>
+        <div class="hist" id="hist"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== BẢO DƯỠNG ===== -->
+  <section id="v-maint" class="view hidden">
+    <div id="maintMain">
+      <div class="card">
+        <h2>🔧 Theo dõi bảo dưỡng</h2>
+        <p class="note" style="margin-top:0">Mốc mặc định chỉ mang tính tham khảo chung. Hãy chỉnh theo sổ bảo dưỡng của hãng xe bạn.</p>
+        <div id="sched"></div>
+        <details id="schedEditBox">
+          <summary>⚙️ Chỉnh chu kỳ &amp; mốc lần cuối</summary>
+          <div id="schedEdit" class="tblwrap"></div>
+          <div class="btns" style="margin-top:10px"><button id="addSched">➕ Thêm hạng mục</button></div>
+        </details>
+      </div>
+
+      <div class="card">
+        <h2 id="mTitle">🧾 Nhập phiếu bảo dưỡng</h2>
+        <div class="btns scanbtns">
+          <button class="pri" id="scanCam">📷 Quét phiếu bằng camera</button>
+          <button id="scanFile">🖼️ Chọn ảnh phiếu</button>
+          <input type="file" id="scanInput" accept="image/*" class="hidden">
+        </div>
+        <div class="status" id="scanStatus">Chụp hoặc chọn ảnh phiếu, app sẽ tự đọc ngày, số km, các hạng mục và số tiền. Bạn kiểm tra lại rồi lưu.</div>
+        <hr>
+        <div class="row">
+          <div><label>Ngày làm</label><input id="mDate" type="date"></div>
+          <div><label>Số km trên đồng hồ</label><input id="mOdo" type="number" inputmode="numeric" min="0" placeholder="Ví dụ 12450"></div>
+        </div>
+        <div class="row1"><label>Gara / nơi bảo dưỡng</label><input id="mPlace" placeholder="Ví dụ: Gara Anh Hai"></div>
+        <label>Các hạng mục</label>
+        <div id="mLines"></div>
+        <div class="btns" style="margin:6px 0 10px"><button id="mAddLine">➕ Thêm dòng</button></div>
+        <div class="totalrow"><span>Tổng cộng</span><b id="mTotal">0 đ</b></div>
+        <div class="row1"><label>Ghi chú</label><input id="mNote" placeholder="Ví dụ: bảo hành 6 tháng"></div>
+        <label class="chk"><input type="checkbox" id="mKeep"> Lưu kèm ảnh phiếu (ảnh nhỏ, chiếm ít bộ nhớ)</label>
+        <div class="btns">
+          <button class="pri" id="mSave">Lưu phiếu</button>
+          <button id="mCancel" class="hidden">Hủy sửa</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📚 Lịch sử bảo dưỡng &amp; sửa chữa</h2>
+        <div class="hist" id="mhist"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== BÁO CÁO ===== -->
+  <section id="v-report" class="view hidden">
+    <div class="card" id="repCtl">
+      <h2>📈 Báo cáo chi phí</h2>
+      <div class="row">
+        <div><label>Xem theo</label>
+          <select id="rMode"><option value="month">Tháng</option><option value="year">Năm</option></select></div>
+        <div><label>Thời gian</label>
+          <input type="month" id="rMonth"><select id="rYear" class="hidden"></select></div>
+      </div>
+      <div class="row1"><label>Phạm vi</label>
+        <select id="rScope"><option value="cur">Xe đang chọn</option><option value="all">Tất cả xe</option></select></div>
+      <div class="btns"><button id="rCsv">📊 Xuất .csv</button><button id="rPrint">🖨️ In / Lưu PDF</button></div>
+    </div>
+    <div id="repOut"></div>
+  </section>
+
+  <!-- ===== BẢN ĐỒ ===== -->
+  <section id="v-map" class="view hidden">
+    <div class="card">
+      <div class="searchrow">
+        <input id="mapQ" placeholder="Tìm địa điểm, địa chỉ…">
+        <button id="mapMic" title="Nói để tìm">🎤</button>
+        <button class="pri" id="mapGo">Tìm</button>
+      </div>
+      <div id="mapRes" class="results"></div>
+      <div class="btns quick">
+        <button id="qFuel">⛽ Cây xăng gần nhất</button>
+        <button id="qFood">🍜 Quán ăn</button>
+        <button id="qCafe">☕ Cà phê</button>
+        <button id="qMe">📍 Vị trí tôi</button>
+      </div>
+    </div>
+    <div id="navBar" class="navbar hidden">
+      <div class="navtxt" id="navText">—</div>
+      <div class="navsub" id="navSub"></div>
+      <button id="navG">🧭 Google Maps</button>
+      <button class="del" id="navStop">Dừng</button>
+    </div>
+    <div id="map"></div>
+    <p class="note mapnote">Chạm vào bản đồ để chọn điểm: dẫn đường, lưu yêu thích hoặc báo camera.</p>
+    <div class="card hidden" id="placesCard">
+      <h2 id="placesTitle">Kết quả</h2>
+      <div class="hist" id="places"></div>
+    </div>
+    <div class="card">
+      <h2>⭐ Điểm ăn uống yêu thích theo khu vực</h2>
+      <div id="favBox"></div>
+    </div>
+  </section>
+
+  <!-- ===== LÁI XE ===== -->
+  <section id="v-drive" class="view hidden">
+    <div class="card warnbox">
+      ⚠️ Không thao tác điện thoại khi đang lái. Hãy gắn điện thoại chắc chắn và bật giọng nói. Các cảnh báo chỉ mang tính hỗ trợ, có thể thiếu hoặc sai; luôn tuân thủ biển báo và quy định giao thông.
+    </div>
+    <div class="card">
+      <div class="speedwrap">
+        <div class="speed" id="spdBox"><b id="spd">0</b><span>km/h</span></div>
+        <div class="limit" id="limitBadge"><b id="limitVal">50</b><span id="limitSrc">đặt tay</span></div>
+      </div>
+      <div class="status" id="drvStatus">Chưa bật theo dõi GPS.</div>
+      <div class="btns" style="margin-top:10px">
+        <button class="pri" id="drvToggle">▶️ Bắt đầu theo dõi</button>
+        <button id="testVoice">🔊 Thử giọng nói</button>
+        <button id="camAdd">📷 Báo camera tại đây</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⚙️ Cài đặt cảnh báo</h2>
+      <label class="chk"><input type="checkbox" id="sVoice"> 🔊 Giọng nói tiếng Việt (dẫn đường và cảnh báo)</label>
+      <label class="chk"><input type="checkbox" id="sSpeed"> 🚦 Cảnh báo vượt tốc độ</label>
+      <label class="chk"><input type="checkbox" id="sAuto"> 🗺️ Tự lấy giới hạn tốc độ từ bản đồ OSM (nếu có)</label>
+      <div class="row" style="margin-top:8px">
+        <div><label>Giới hạn đặt tay (km/h)</label><input id="sLimit" type="number" min="10" max="150" inputmode="numeric"></div>
+        <div><label>Cho phép vượt (km/h)</label><input id="sTol" type="number" min="0" max="30" inputmode="numeric"></div>
+      </div>
+      <label class="chk"><input type="checkbox" id="sCam"> 📸 Cảnh báo gần camera giám sát</label>
+      <p class="note">Dữ liệu camera lấy từ bản đồ mở OpenStreetMap và các điểm bạn tự báo, nên <b>chưa đầy đủ</b>. App không thể tra phạt nguội thay bạn; dùng nút "Tra cứu phạt nguội" ở tab Xe &amp; dữ liệu.</p>
+      <div id="camList"></div>
+    </div>
+
+    <div class="card">
+      <h2>🛣️ Cảnh báo lệch làn <span class="chip amber">thử nghiệm</span></h2>
+      <label class="chk"><input type="checkbox" id="sLane"> Bật camera sau/trước của điện thoại để phát hiện lệch làn</label>
+      <div id="laneBox" class="hidden">
+        <div class="lanevid"><video id="laneVideo" playsinline muted></video><canvas id="laneCanvas"></canvas></div>
+        <div class="btns" style="margin-top:8px"><button id="laneCalib">🎯 Hiệu chuẩn (đang đi giữa làn)</button></div>
+        <div class="status" id="laneStatus">Đang khởi động camera…</div>
+      </div>
+      <p class="note">Hướng camera nhìn thẳng về phía trước, thấy rõ vạch kẻ đường. Hoạt động tốt nhất khi vạch rõ, ban ngày. Xử lý hoàn toàn trên máy, không gửi video đi đâu. Không biết khi bạn bật xi-nhan, nên có thể báo nhầm lúc chủ động chuyển làn.</p>
+    </div>
+  </section>
+
+  <!-- ===== XE & DỮ LIỆU ===== -->
+  <section id="v-data" class="view hidden">
+    <div class="card hidden" id="vehCard">
+      <h2 id="vehTitle">🚗 Thêm xe</h2>
+      <div class="row">
+        <div><label>Tên xe</label><input id="vName" placeholder="Ví dụ: Honda Vision, Vios 2020"></div>
+        <div><label>Loại xe</label><select id="vKind"><option value="bike">🛵 Xe máy</option><option value="car">🚗 Ô tô</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>Biển số</label><input id="vPlate" placeholder="51F-123.45"></div>
+        <div><label>Số km hiện tại</label><input id="vOdo" type="number" inputmode="numeric" min="0" placeholder="0"></div>
+      </div>
+      <div class="row">
+        <div><label>⛽ Dung tích bình xăng (lít)</label><input id="vTank" type="number" inputmode="decimal" step="0.1" placeholder="Ví dụ 5.5"></div>
+        <div><label>Tiêu hao công bố (L/100km)</label><input id="vCons" type="number" inputmode="decimal" step="0.1" placeholder="Ví dụ 1.9"></div>
+      </div>
+      <div class="row">
+        <div><label>📋 Đăng kiểm hết hạn</label><input id="vInspect" type="date"></div>
+        <div><label>🛡️ Bảo hiểm TNDS hết hạn</label><input id="vIns" type="date"></div>
+      </div>
+      <div class="btns">
+        <button class="pri" id="vSave">Lưu xe</button>
+        <button id="vCancel" class="hidden">Hủy</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>☁️ Quản lý dữ liệu</h2>
+      <div class="btns">
+        <button id="bAdd">🚗 Thêm xe khác</button>
+        <button id="bEdit">✏️ Sửa xe này</button>
+        <button id="bDel" class="del">🗑️ Xóa xe này</button>
+        <button id="bCsgt">🔎 Tra cứu phạt nguội</button>
+        <button id="bNotif">🔔 Bật nhắc khi mở app</button>
+      </div>
+      <hr>
+      <div class="btns">
+        <button id="bJson">💾 Tải file sao lưu (.json)</button>
+        <button id="bCopy">📋 Sao chép bản sao lưu</button>
+        <button id="bOpen">📂 Mở file sao lưu…</button>
+        <button id="bCsv">📊 Xuất Excel (.csv)</button>
+      </div>
+      <input type="file" id="fileIn" accept=".json,application/json" class="hidden">
+      <p class="note">Dữ liệu được lưu trong trình duyệt trên thiết bị này. Hãy tải file sao lưu định kỳ để chuyển sang máy khác hoặc phòng khi mất dữ liệu.</p>
+
+      <details id="gd">
+        <summary>Đồng bộ Google Drive (tùy chọn)</summary>
+        <div class="btns" style="margin-top:10px">
+          <button class="pri" id="gConn">☁️ Kết nối Google Drive</button>
+          <button id="gUp" disabled>⬆️ Lưu lên Drive</button>
+          <button id="gDown" disabled>⬇️ Tải từ Drive</button>
+        </div>
+        <div class="row1" style="margin-top:10px;display:flex;gap:8px">
+          <input id="cid" placeholder="Dán Google Client ID (…apps.googleusercontent.com)">
+          <button class="pri" id="cidSave" style="white-space:nowrap">Lưu</button>
+        </div>
+        <p class="note">Cách lấy Client ID: vào Google Cloud Console → bật Google Drive API → tạo OAuth Client ID loại "Web application" → thêm địa chỉ trang này (vd. https://tên.github.io) vào "Authorized JavaScript origins". App chỉ dùng thư mục dữ liệu riêng của app trên Drive, không đọc file khác của bạn.</p>
+        <div class="status" id="gStatus"></div>
+      </details>
+    </div>
+  </section>
+</div>
+
+<nav class="bottom">
+  <button data-view="home" class="on"><b>📊</b>Tổng quan</button>
+  <button data-view="maint"><b>🔧</b>Bảo dưỡng</button>
+  <button data-view="report"><b>📈</b>Báo cáo</button>
+  <button data-view="map"><b>🗺️</b>Bản đồ</button>
+  <button data-view="drive"><b>🚦</b>Lái xe</button>
+  <button data-view="data"><b>⚙️</b>Xe &amp; dữ liệu</button>
+</nav>
+
+<!-- Quét phiếu bằng camera -->
+<div id="scanModal" class="modal hidden">
+  <div class="modalbox">
+    <video id="camVideo" playsinline muted></video>
+    <div class="status" id="camMsg">Đưa phiếu vào khung hình, giữ chắc tay rồi bấm Chụp.</div>
+    <div class="btns" style="margin-top:10px;justify-content:center">
+      <button class="pri" id="camShot">📸 Chụp &amp; đọc phiếu</button>
+      <button id="camClose">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lưu điểm yêu thích -->
+<dialog id="favDlg">
+  <h2 style="margin:0 0 10px">⭐ Lưu điểm yêu thích</h2>
+  <div class="row1"><label>Tên</label><input id="fvName"></div>
+  <div class="row">
+    <div><label>Loại</label><select id="fvKind"><option value="food">🍜 Quán ăn</option><option value="cafe">☕ Cà phê</option><option value="other">📍 Khác</option></select></div>
+    <div><label>Đánh giá</label><select id="fvRate"><option value="5">★★★★★</option><option value="4">★★★★☆</option><option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option><option value="1">★☆☆☆☆</option></select></div>
+  </div>
+  <div class="row1"><label>Ghi chú (món ngon, giờ mở cửa…)</label><input id="fvNote"></div>
+  <div class="btns"><button class="pri" id="fvOk">Lưu</button><button id="fvCancel">Hủy</button></div>
+</dialog>
+
+<div id="toast"></div>
+
+<script src="js/logic.js"></script>
+<script src="js/app.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/scan.js"></script>
+<script src="js/map.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/gdrive.js"></script>
+<script>SX.init();</script>
+</body>
+</html>
